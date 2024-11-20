@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"wallet-app/pkg/logger"
 
 	"github.com/google/uuid"
@@ -17,14 +18,14 @@ type PostgresDB struct {
 var _ Database = (*PostgresDB)(nil)
 
 func NewPostgresDB(dsn string) (*PostgresDB, error) {
-	log := logger.NewLogger().With("storage.postgres")
+	log := logger.NewLogger()
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, log.WithError(err, "failed to open database")
+		return nil, fmt.Errorf("failed to open database")
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, log.WithError(err, "failed to connect to database")
+		return nil, fmt.Errorf("failed to connect to database")
 	}
 
 	_, err = db.Exec(`
@@ -34,7 +35,7 @@ func NewPostgresDB(dsn string) (*PostgresDB, error) {
 		)
 	`)
 	if err != nil {
-		return nil, log.WithError(err, "failed to create table")
+		return nil, fmt.Errorf("failed to create table")
 	}
 
 	return &PostgresDB{db: db, log: log}, nil
@@ -45,7 +46,7 @@ func (pg *PostgresDB) CreateWallet() (string, error) {
 	query := "INSERT INTO wallets (id, balance) VALUES ($1, $2)"
 	_, err := pg.db.Exec(query, walletID, 0)
 	if err != nil {
-		return "", pg.log.WithError(err, "failed to create wallet")
+		return "", fmt.Errorf("failed to create wallet")
 	}
 	return walletID, nil
 }
@@ -69,7 +70,7 @@ func (pg *PostgresDB) ExecuteTransaction(walletID string, operation string, amou
 	err = tx.QueryRow(query, walletID).Scan(&balance)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return balance, pg.log.WithError(err, "wallet not found")
+			return balance, fmt.Errorf("wallet not found")
 		}
 		return balance, err
 	}
@@ -79,11 +80,11 @@ func (pg *PostgresDB) ExecuteTransaction(walletID string, operation string, amou
 		balance += amount
 	case "WITHDRAW":
 		if balance < amount {
-			return balance, pg.log.WithError(err, "insufficient funds")
+			return balance, fmt.Errorf("insufficient funds")
 		}
 		balance -= amount
 	default:
-		return balance, pg.log.WithError(err, "invalid operation type")
+		return balance, fmt.Errorf("invalid operation type")
 	}
 
 	query = "UPDATE wallets SET balance = $2 WHERE id = $1"

@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.wallet
+    env_file:
+      - config.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pgbouncer
+    restart: on-failure
+
+  db:
+    image: postgres:15
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    command: -c 'max_connections=100'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5435:5432"
+
+  pgbouncer:
+    image: bitnami/pgbouncer:1.23.0
+    depends_on:
+      - db
+    environment:
+      POSTGRESQL_HOST: db
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: postgres
+      POSTGRESQL_DATABASE: postgres
+      PGBOUNCER_PORT: 6432
+      PGBOUNCER_MAX_CLIENT_CONN: 1000
+    ports:
+      - "6432:6432"
+
+volumes:
+  pg-data:

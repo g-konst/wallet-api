@@ -1,0 +1,20 @@
+# Build stage
+FROM golang:1.23 AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . ./
+
+RUN GOOS=linux GOARCH=amd64 go build -o main ./cmd/server/main.go
+
+# Runtime stage
+FROM debian:bullseye-slim
+
+WORKDIR /app
+COPY --from=builder /app/main /app/main
+COPY config.env config.env
+
+CMD ["/app/main"]

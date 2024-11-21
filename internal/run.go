@@ -14,6 +14,11 @@ import (
 	"wallet-app/pkg/logger"
 )
 
+type Job struct {
+	Request  *http.Request
+	Response http.ResponseWriter
+}
+
 func Run(cfg *Config, log *logger.Log) error {
 	db, err := storage.NewPostgresDB(cfg.DatabaseUrl)
 	if err != nil {
@@ -23,15 +28,25 @@ func Run(cfg *Config, log *logger.Log) error {
 	defer db.Close()
 
 	httpServer := application.NewHttpServer(db)
+
+	var jobs = make(chan *Job, cfg.JobsCount)
+
 	var serverAddress = cfg.ListenAndPort()
 	server := &http.Server{
 		Addr: serverAddress,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			httpServer.ServeHTTP(w, r)
+			jobs <- &Job{
+				Request:  r,
+				Response: w,
+			}
 		}),
 		IdleTimeout:  cfg.ServerIdleTimeout,
 		ReadTimeout:  cfg.ServerTimeout,
 		WriteTimeout: cfg.ServerTimeout,
+	}
+
+	for w := 1; w <= cfg.WorkersCount; w++ {
+		go worker(w, jobs, httpServer, log)
 	}
 
 	done := make(chan os.Signal, 1)
@@ -57,4 +72,11 @@ func Run(cfg *Config, log *logger.Log) error {
 
 	log.Info("Server shutdown properly")
 	return nil
+}
+
+func worker(id int, jobs <-chan *Job, httpServer http.Handler, log *logger.Log) {
+	for job := range jobs {
+		httpServer.ServeHTTP(job.Response, job.Request)
+		log.Info(fmt.Sprintf("Worker %d processed request", id))
+	}
 }

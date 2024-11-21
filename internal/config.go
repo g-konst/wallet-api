@@ -13,6 +13,8 @@ type Config struct {
 	ServerTimeout     time.Duration `mapstructure:"SERVER_TIMEOUT"`
 	ServerIdleTimeout time.Duration `mapstructure:"SERVER_IDLE_TIMEOUT"`
 	DatabaseUrl       string        `mapstructure:"DATABASE_URL"`
+	WorkersCount      int           `mapstructure:"WORKERS_COUNT"`
+	JobsCount         int           `mapstructure:"JOBS_COUNT"`
 }
 
 func (c *Config) ListenAndPort() string {
@@ -30,6 +32,8 @@ func MustLoadConfig() *Config {
 	v.SetDefault("SERVER_TIMEOUT", "5s")
 	v.SetDefault("SERVER_IDLE_TIMEOUT", "5s")
 	v.SetDefault("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/postgres")
+	v.SetDefault("WORKERS_COUNT", 100)
+	v.SetDefault("JOBS_COUNT", 1000)
 
 	v.SetConfigType("env")
 	v.SetConfigFile("config.env")
